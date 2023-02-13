@@ -1,2 +1,6 @@
-(test
- (name GoCaml))
+(library
+ (name GoCaml)
+ (inline_tests)
+ (preprocess
+  (pps ppx_jane ppx_inline_test))
+ (libraries base Core))

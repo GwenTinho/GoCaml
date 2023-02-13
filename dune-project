@@ -19,7 +19,17 @@
  (name GoCaml)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml dune)
+ (depends
+  ocaml
+  dune
+  (base
+   (>= 4.13))
+  (ppx_inline_test
+   (>= 4.13))
+  (ppx_jane
+   (>= 4.13))
+  (ppx_assert
+   (>= 0.15.0)))
  (tags
   (topics "to describe" your project)))
 

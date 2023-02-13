@@ -1,2 +1,5 @@
 (library
- (name Core))
+ (name Core)
+ (preprocess
+  (pps ppx_jane))
+ (libraries base))
