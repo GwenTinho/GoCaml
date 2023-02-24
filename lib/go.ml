@@ -61,6 +61,16 @@ let initGame dimension = {
   currentBoard=initBoard dimension;
 }
 
+let label = function
+| Black -> "black"
+| White -> "white"
+
+let showPoint p =
+  let {row; column; color} = p in
+  Caml.Printf.printf "(%d,%d) color: %s\n" row column (label color)
+
+let showPoints (p:points) = Set.iter p ~f:showPoint
+
 let didBoardChange gs = match gs.previousBoard with
   | None -> true
   | Some b ->  b = gs.currentBoard
@@ -91,11 +101,12 @@ let shareTeam p1 p2 = p1.color = p2.color
 let isNeighbour dimension p1 p2 =
   validPoint dimension p1 && validPoint dimension p2 && adjacant p1 p2
 
-let connected (board:board) p: points =
+  (*update code to allow to fill component out!!*)
+let connected (board:board) (p:point) :points =
   let points, dim = board in
   Set.filter points ~f:(isNeighbour dim p)
 
-let chain (board: board) p:points =
+let chain (board: board) (p:point) :points =
   let points, dim = board in
   Set.filter points ~f:(fun pp -> isNeighbour dim p pp && shareTeam p pp)
 

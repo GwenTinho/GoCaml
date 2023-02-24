@@ -69,5 +69,4 @@ let%test "isNeighbour2" = isNeighbour dim p1 p1
 let%test "isNeighbour3" = isNeighbour dim p2 pw
 let%test "isNeighbour4" = not (isNeighbour dim p1 p3)
 let%test "isNeighbour5" = not (isNeighbour dim p2 p3)
-
-(*Add tests for connected onwards*)
+let%test "isNeighbour6" = isNeighbour dim ({row=3; column=3;color=Black}) pw
