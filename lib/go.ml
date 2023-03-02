@@ -1,12 +1,14 @@
 open Base
+open Graph
 
 type color = Black | White
-
 let (=) = Poly.(=);;
 
-type point =
+type point = Piece of
   {color: (color [@sexp.opaque]) [@compare.ignore] ; row:int; column:int; }
-  [@@deriving compare, sexp, hash]
+   | Border of {row:int; column:int; } [@@deriving compare, sexp, hash]
+
+type coord = {row:int; column:int} [@@deriving compare, sexp, hash]
 
 module Point = struct
   module T = struct
@@ -44,13 +46,27 @@ type gameState = {
   currentBoard: board;
 }
 
-let l1Dist p1 p2 = abs (p1.row - p2.row) + abs (p1.column - p2.column)
+let toCoords = function
+| Piece {color=_; row; column} -> {row; column}
+| Border {row; column} -> {row; column}
+
+let l1Dist c1 c2 = abs (c1.row - c2.row) + abs (c1.column - c2.column)
 
 let emptyPSet () : points= Set.empty (module Point)
 
 let initPlayer color = {team=color; score=0}
 
-let initBoard dimension: board = (emptyPSet (),dimension)
+let initBoard dimension: board =
+  let {width; height} = dimension in
+  let borderPieceCount = 2 * (width + height) in
+  let pointList = List.init borderPieceCount ~f:(fun i -> match i with
+  | i when i < width -> Border {row= -1; column=i}
+  | i when i < width + width -> let i = i - width in Border {column=i;row=height+1}
+  | i when i < 2 * width + height -> let i = i - 2 * width in Border {column= -1;row=i}
+  | i -> let i = i - 2 * width - height in Border {column=width+1;row=i}
+  ) in
+  let pts = Set.of_list (module Point) pointList in
+  (pts,dimension)
 
 let initGame dimension = {
   playerBlack=initPlayer Black;
@@ -61,13 +77,17 @@ let initGame dimension = {
   currentBoard=initBoard dimension;
 }
 
-let label = function
+let labelcolor = function
 | Black -> "black"
 | White -> "white"
 
+let labelpiece = function
+| Piece {row=_; column=_;color} -> labelcolor color
+| Border _ -> "Border"
+
 let showPoint p =
-  let {row; column; color} = p in
-  Caml.Printf.printf "(%d,%d) color: %s\n" row column (label color)
+  let {row; column} = toCoords p in
+  Caml.Printf.printf "(%d,%d) color: %s\n" row column (labelpiece p)
 
 let showPoints (p:points) = Set.iter p ~f:showPoint
 
@@ -76,50 +96,69 @@ let didBoardChange gs = match gs.previousBoard with
   | Some b ->  b = gs.currentBoard
 
 (*Coordinate are 0 indexed*)
-let validPoint dimension point =
-  point.row >= 0 &&
-  point.row < dimension.height &&
-  point.column >= 0 &&
-  point.column < dimension.width
+let validCoord dimension coord =
+  coord.row >= 0 &&
+  coord.row < dimension.height &&
+  coord.column >= 0 &&
+  coord.column < dimension.width
+
+let validPiece dimension = function
+| Border _ -> true
+| p -> validCoord dimension (toCoords p)
+
 
 let onBoard (board: board) point =
   let points, dim = board in
-  validPoint dim point && Set.mem points point
+  validPiece dim point && Set.mem points point
 
 let addPieceToBoard (board: board) point: board option =
   let points, dim = board in
-  if validPoint dim point && not (Set.mem points point)  then
+  if validPiece dim point && not (Set.mem points point)  then
     Some (Set.add points point, dim)
   else
     None
 
 let adjacant p1 p2 =
-    l1Dist p1 p2 <= 1
+    l1Dist (toCoords p1) (toCoords p2) <= 1
 
-let shareTeam p1 p2 = p1.color = p2.color
+let shareTeam p1 p2 = match p1,p2 with
+| (Piece p1, Piece p2) -> p1.color = p2.color
+| _ -> false
 
 let isNeighbour dimension p1 p2 =
-  validPoint dimension p1 && validPoint dimension p2 && adjacant p1 p2
+  validCoord dimension (toCoords p1) && validCoord dimension (toCoords p2) && adjacant p1 p2
 
-  (*update code to allow to fill component out!!*)
-let connected (board:board) (p:point) :points =
+(*Neighbours is reflexive!*)
+let neigbours (board:board) (p:point) :point list =
   let points, dim = board in
-  Set.filter points ~f:(isNeighbour dim p)
+  Set.to_list (Set.filter points ~f:(isNeighbour dim p))
+
+let connected (board:board) (p:point) :points =
+  Set.of_list (module Point) (dfs (neigbours board) p)
+
+let neigboursSameTeam (board:board) (p:point) :point list =
+  let points, dim = board in
+  Set.to_list (Set.filter points ~f:(fun pp -> isNeighbour dim p pp && shareTeam p pp))
 
 let chain (board: board) (p:point) :points =
-  let points, dim = board in
-  Set.filter points ~f:(fun pp -> isNeighbour dim p pp && shareTeam p pp)
+  Set.of_list (module Point) (dfs (neigboursSameTeam board) p)
 
-let maxLiberties dimension p =
-  let rem = if p.row = 0 || p.row = dimension.height - 1 then
-    3 else 4 in
-  let rem = if p.column = 0 || p.column = dimension.width - 1 then
-    rem - 1 else rem in
-  rem
+(*A point is surrounded if it has 5 neighours (1 up 1 down 1 left 1 right 1 itself)*)
+let surrounded (board:board) (p:point) = List.length (neigbours board p) = 5
+
+(*TODO find out if a chain is surrounded
+  - a component is dead if every point in the component has colored neigbours or is on the edge
+  *)
+let isDead board (comp:points) = Set.for_all comp ~f:(surrounded board)
 
 
-(*finds the liberties of the point if it is in the board otherwise it will find the liberties if the point was added*)
-let liberties board p =
-    let c = connected board p in
-    maxLiberties (snd board) p - Set.length c
+
+
+
+
+
+
+
+
+
 
